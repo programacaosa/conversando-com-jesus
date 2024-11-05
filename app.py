@@ -44,7 +44,7 @@ def get_response(question, questions_and_responses):
 questions_and_responses = load_questions_and_responses()
 
 # Configuração da interface Streamlit
-st.title("Sistema de Perguntas e Respostas")
+st.title("Conversando com DEUS ...")
 
 # Campo de texto para entrada da pergunta
 question = st.text_input("Digite sua pergunta:")
