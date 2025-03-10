@@ -38,7 +38,7 @@ if 'current_question' not in st.session_state:
     st.session_state.current_question = ""
 
 # Interface principal
-st.title("ChatBot com Aprendizado Contínuo 🤖📚")
+st.title("ChatBot com Aprendizado Contínuo")
 
 # Campo de pergunta
 user_input = st.text_input("Digite sua pergunta:", key="user_input")
@@ -61,11 +61,11 @@ if st.button("Enviar"):
         else:
             st.session_state.teach_mode = True
     else:
-        st.warning("⚠️ Digite uma pergunta válida!")
+        st.warning("Digite uma pergunta válida")
 
 # Modo de aprendizado
 if st.session_state.teach_mode:
-    st.warning("❓ Desculpe, não sei a resposta. Gostaria de me ensinar?")
+    st.warning("Desculpe, não sei a resposta. Gostaria de me ensinar?")
     
     with st.form(key='teach_form'):
         new_keywords = st.text_input("Digite palavras-chave (separadas por vírgula)")
@@ -73,7 +73,7 @@ if st.session_state.teach_mode:
         submit_button = st.form_submit_button("Salvar novo conhecimento")
     
     if submit_button:
-        if new_keywords.strip() and new_response.strip():
+        if new_keywords and new_response:
             # Formata nova entrada
             keywords_list = [k.strip().lower() for k in new_keywords.split(",")]
             new_entry = {
@@ -85,7 +85,7 @@ if st.session_state.teach_mode:
             save_data("data.txt", new_entry)
             st.session_state.data = load_data("data.txt")  # Recarrega dados atualizados
             st.session_state.teach_mode = False
-            st.success("✅ Aprendizado concluído com sucesso!")
-            st.rerun()  # ✅ Recarrega a interface atualizado
+            st.success("Aprendizado concluído com sucesso!")
+            st.experimental_rerun()  # Recarrega a interface
         else:
-            st.error("⚠️ Preencha todos os campos para ensinar uma nova resposta!")
+            st.error("Preencha todos os campos!") 
