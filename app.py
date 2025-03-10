@@ -1,83 +1,91 @@
-import os
 import streamlit as st
-import unicodedata
+import re
+from datetime import datetime
 
-# Define o caminho para o arquivo de dados
-DATA_DIR = "dados"
-QUESTION_RESPONSE_FILE = os.path.join(DATA_DIR, "perguntas_respostas.txt")
+# Carrega dados existentes
+def load_data(file_name):
+    data = []
+    try:
+        with open(file_name, 'r', encoding='utf-8') as file:
+            for line in file:
+                line = line.strip()
+                if line and ":" in line:
+                    keys, resp = line.split(":", 1)
+                    keywords = [k.strip().lower() for k in keys.split(",")]
+                    data.append({
+                        "keywords": keywords,
+                        "response": resp.strip()
+                    })
+        data.sort(key=lambda x: max(len(k) for k in x["keywords"]), reverse=True)
+        return data
+    except FileNotFoundError:
+        return []
 
-# Certifique-se de que o diretório de dados existe
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
+# Salva novos dados
+def save_data(file_name, new_entry):
+    with open(file_name, "a", encoding='utf-8') as f:
+        keywords = ", ".join(new_entry["keywords"])
+        f.write(f"\n{keywords}: {new_entry['response']}")
 
-# Função para normalizar o texto (ignorando acentos e case)
-def normalize_text(text):
-    # Normaliza o texto removendo acentos e transformando em minúsculas
-    text = unicodedata.normalize('NFD', text)  # Decomposição de caracteres Unicode
-    text = ''.join([c for c in text if unicodedata.category(c) != 'Mn'])  # Remove os acentos
-    return text.lower()
+# Inicialização do session state
+if 'data' not in st.session_state:
+    st.session_state.data = load_data("data.txt")
 
-# Função para carregar perguntas e respostas do arquivo
-def load_questions_and_responses():
-    if not os.path.exists(QUESTION_RESPONSE_FILE):
-        return []  # Se o arquivo não existir, retorna uma lista vazia
-    
-    with open(QUESTION_RESPONSE_FILE, "r", encoding="utf-8") as file:
-        # Carrega perguntas e respostas separadas por ":", e retorna como lista de pares (pergunta, resposta)
-        return [line.strip().split(":", 1) for line in file.readlines() if line.strip()]
+if 'teach_mode' not in st.session_state:
+    st.session_state.teach_mode = False
 
-# Função para salvar a pergunta no arquivo
-def save_question(question):
-    with open(QUESTION_RESPONSE_FILE, "a", encoding="utf-8") as file:
-        file.write(f"{question}:\n")  # Salva a pergunta com ":" e uma linha em branco para a resposta
+if 'current_question' not in st.session_state:
+    st.session_state.current_question = ""
 
-# Função para buscar a resposta para a pergunta no arquivo
-def get_response(question, questions_and_responses):
-    question_normalized = normalize_text(question)  # Normaliza a pergunta antes de comparar
-    for line in questions_and_responses:
-        stored_question = line[0].strip()  # Pergunta registrada
-        if normalize_text(stored_question) == question_normalized:
-            return line[1].strip() if len(line) > 1 else None  # Retorna a resposta, se existir
-    return None
+# Interface principal
+st.title("ChatBot com Aprendizado Contínuo")
 
-# Carregar perguntas e respostas do arquivo
-questions_and_responses = load_questions_and_responses()
+# Campo de pergunta
+user_input = st.text_input("Digite sua pergunta:", key="user_input")
 
-# Configuração da interface Streamlit
-st.title("Conversando com DEUS ...")
-
-# Campo de texto para entrada da pergunta
-question = st.text_input("Digite sua pergunta:")
-
-# Função para exibir as perguntas e respostas com balões, um ao lado do outro
-def display_conversation(question, response):
-    col1, col2 = st.columns([3, 6])  # Colunas para pergunta à esquerda e resposta à direita
-    
-    # Exibe a pergunta com estilo de balão à esquerda
-    with col1:
-        if question:
-            st.markdown(f'<div style="background-color: #DCF8C6; padding: 15px 20px; border-radius: 20px; max-width: 70%; word-wrap: break-word; margin-bottom: 15px; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);">'
-                        f'<strong>Você:</strong><br>{question}</div>', unsafe_allow_html=True)
-    
-    # Exibe a resposta com estilo de balão à direita e deslocando um pouco para baixo
-    with col2:
-        if response:
-            st.markdown(f'<div style="background-color: #FFFFFF; padding: 15px 20px; border-radius: 20px; max-width: 70%; word-wrap: break-word; border: 1px solid #ECE5DD; margin-top: 25px; margin-bottom: 15px; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);">'
-                        f'<strong>Jesus:</strong><br>{response}</div>', unsafe_allow_html=True)
-
-# Botão para enviar a pergunta
 if st.button("Enviar"):
-    if question:
-        # Salvar a pergunta no arquivo
-        save_question(question)
+    if user_input.strip():
+        st.session_state.current_question = user_input
+        cleaned = re.sub(r'[^\w\s]', '', user_input.lower())
+        response = None
 
-        # Atualizar a lista de perguntas e respostas após salvar
-        questions_and_responses = load_questions_and_responses()
-
-        # Buscar a resposta para a pergunta
-        response = get_response(question, questions_and_responses)
-
-        # Exibir a pergunta e a resposta no formato de balões
-        display_conversation(question, response)
+        # Busca resposta
+        for entry in st.session_state.data:
+            if any(keyword in cleaned for keyword in entry["keywords"]):
+                response = entry["response"]
+                break
+        
+        if response:
+            st.session_state.teach_mode = False
+            st.success(f"**Resposta:** {response}")
+        else:
+            st.session_state.teach_mode = True
     else:
-        st.warning("Por favor, insira uma pergunta.")
+        st.warning("Digite uma pergunta válida")
+
+# Modo de aprendizado
+if st.session_state.teach_mode:
+    st.warning("Desculpe, não sei a resposta. Gostaria de me ensinar?")
+    
+    with st.form(key='teach_form'):
+        new_keywords = st.text_input("Digite palavras-chave (separadas por vírgula)")
+        new_response = st.text_area("Digite a resposta correta")
+        submit_button = st.form_submit_button("Salvar novo conhecimento")
+    
+    if submit_button:
+        if new_keywords and new_response:
+            # Formata nova entrada
+            keywords_list = [k.strip().lower() for k in new_keywords.split(",")]
+            new_entry = {
+                "keywords": keywords_list,
+                "response": new_response.strip()
+            }
+            
+            # Salva no arquivo e atualiza sessão
+            save_data("data.txt", new_entry)
+            st.session_state.data = load_data("data.txt")  # Recarrega dados atualizados
+            st.session_state.teach_mode = False
+            st.success("Aprendizado concluído com sucesso!")
+            st.experimental_rerun()  # Recarrega a interface
+        else:
+            st.error("Preencha todos os campos!")
